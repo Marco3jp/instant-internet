@@ -17,10 +17,10 @@ Create your fantasies on the internet. Eureka, at that instant.
 {
     "eurekaes": [
         {
-            dir: "summer-sky",
-            command: "npm run build",
-            distDir: "dist",
-            publicName: "summer-sky"
+            "dir": "summer-sky",
+            "command": "npm run build",
+            "distDir": "dist",
+            "publicName": "summer-sky"
         }
     ]
 }
