@@ -8,9 +8,6 @@ on:
 jobs:
   build-deploy:
     runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: frontend
 
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +24,7 @@ jobs:
           deno-version: v1.x
 
       - name: Run deploy script
-        run: deno run --allow-write=dist --allow-run --no-prompt ./deploy.ts
+        run: deno run --allow-read --allow-write --allow-run --no-prompt ./deploy.ts
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
