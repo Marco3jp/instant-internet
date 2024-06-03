@@ -1,10 +1,15 @@
+export interface BuildCommand {
+    exec: string
+    args: Array<string>
+}
+
 interface ProjectConfig {
     projectRoot: string
     eurekaes: Array<
         {
             dir: string
-            // command がもし未定義ならコマンドの実行をスキップしてdistDirをコピーする処理に進む
-            command?: string
+            // commands がもし未定義ならコマンドの実行をスキップしてdistDirをコピーする処理に進む
+            commands?: Array<BuildCommand>
             // distDir がもし未定義なら対象のディレクトリをそのままコピーする
             distDir?: string
             // publicName がもし未定義ならdir名を利用する
@@ -18,7 +23,16 @@ export default <ProjectConfig>{
     eurekaes: [
         {
             dir: "test-for-with-bundler",
-            command: "npm run ci && npm run build -- --base=/instant-internet/test-for-with-bundler/",
+            commands: [
+                {
+                    exec: "npm",
+                    args: ["ci"]
+                },
+                {
+                    exec: "npm",
+                    args: ["run", "build", "--", "--base=/instant-internet/test-for-with-bundler/"]
+                }
+            ],
             distDir: "dist"
         },
         {
