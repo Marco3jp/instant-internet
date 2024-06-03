@@ -3,15 +3,13 @@ import { copy } from "https://deno.land/std@0.224.0/fs/copy.ts";
 import config, { BuildCommand } from "./projects.config.ts"
 
 async function runBuildCommands(commands: Array<BuildCommand>) {
-    let preOut: Deno.CommandOutput | null = null
-
     for (const command of commands) {
         const childProcess = new Deno.Command(command.exec, { args: command.args, stdout: "piped", stderr: "piped" }).spawn()
-        preOut = await childProcess.output()
+        const out = await childProcess.output()
 
-        console.log(new TextDecoder().decode(preOut.stdout))
-        if (preOut.stderr) {
-            console.error(new TextDecoder().decode(preOut.stderr))
+        console.log(new TextDecoder().decode(out.stdout))
+        if (out.stderr) {
+            console.error(new TextDecoder().decode(out.stderr))
         }
     }
 }
