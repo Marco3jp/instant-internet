@@ -15,7 +15,7 @@ async function runBuildCommands(commands: Array<BuildCommand>) {
 }
 
 async function buildAndCopyAllProject() {
-    const initialeCwd = Deno.cwd();
+    const initialCwd = Deno.cwd();
 
     // とりあえずプロジェクトは直列でビルドする
     for (const eureka of config.eurekaes) {
@@ -25,7 +25,7 @@ async function buildAndCopyAllProject() {
             await runBuildCommands(eureka.commands)
         }
 
-        Deno.chdir(initialeCwd) // popd
+        Deno.chdir(initialCwd) // popd
 
         try {
             await copy(`./${config.projectRoot}/${eureka.dir}/${eureka.distDir || ""}`, `./dist/${eureka.publicName || eureka.dir}`)
