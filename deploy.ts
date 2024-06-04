@@ -39,6 +39,29 @@ async function buildAndCopyAllProject() {
     }
 }
 
+function generateIndexPage() {
+    const projectPages = config.eurekaes.map(eureka => {
+        return eureka.publicName || eureka.dir
+    })
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+    <title>Project List</title>
+</head>
+<body>
+<h1>Project List</h1>
+<ul>
+${projectPages.map(page => `<li><a href="./${page}/">${page}</a></li>`).join("\n")}
+</ul>
+</body>`
+}
+
+function createIndexPage() {
+    const pageContent = generateIndexPage()
+    Deno.writeTextFileSync("./dist/index.html", pageContent)
+}
+
 // 多分権限がなければ落ちるはずなので、まあそれでいいかなと思ってエラーハンドリング書いてない
 async function checkPermission() {
     // NOTE: readに関しては設定自体tsファイルにしていてimportしているので大丈夫そう
@@ -56,6 +79,7 @@ async function checkPermission() {
 async function main() {
     await checkPermission()
     await buildAndCopyAllProject()
+    createIndexPage()
 }
 
 main()
