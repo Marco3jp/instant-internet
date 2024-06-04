@@ -1,0 +1,9 @@
+body {
+    background-color: #000;
+    margin: 0;
+}
+
+em-emoji-picker {
+    height: 100dvh;
+    width: 100dvw;
+}
