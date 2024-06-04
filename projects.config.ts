@@ -22,6 +22,19 @@ export default <ProjectConfig>{
     projectRoot: "projects",
     eurekaes: [
         {
+            dir: "emoji-picker",
+            commands: [
+                {
+                    exec: "npm",
+                    args: ["ci"]
+                },
+                {
+                    exec: "npm",
+                    args: ["run", "build", "--", "--base=/instant-internet/emoji-picker/"]
+                }
+            ]
+        },
+        {
             dir: "test-for-with-bundler",
             commands: [
                 {
