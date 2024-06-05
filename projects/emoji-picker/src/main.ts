@@ -21,7 +21,10 @@ async function copyEmoji(emoji) {
 const pickerOptions = {
    onEmojiSelect: copyEmoji,
    theme: "dark",
-   dynamicWidth: true
+   autoFocus: true,
+   emojiButtonSize: 36 * 2,
+   emojiSize: 24 * 2,
+   dynamicWidth: true,
   }
 const picker = new Picker(pickerOptions)
 

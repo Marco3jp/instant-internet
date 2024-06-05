@@ -6,6 +6,8 @@ body {
 em-emoji-picker {
     height: 100dvh;
     width: 100dvw;
+    /* 一部のデカい絵文字が横貫通するため無視するために暫定対処 */
+    overflow: hidden;
 }
 
 #copied-dialog[open] {
