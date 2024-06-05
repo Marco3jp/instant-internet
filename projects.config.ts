@@ -32,7 +32,8 @@ export default <ProjectConfig>{
                     exec: "npm",
                     args: ["run", "build", "--", "--base=/instant-internet/emoji-picker/"]
                 }
-            ]
+            ],
+            distDir: "dist"
         },
         {
             dir: "test-for-with-bundler",
