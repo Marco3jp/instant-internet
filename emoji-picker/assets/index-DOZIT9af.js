@@ -713,4 +713,4 @@ button {
   background-color: #61493f;
 }
 
-`;let I=null;const Ee=document.querySelector("#copied-dialog");async function Ft(t){I&&clearTimeout(I),await navigator.clipboard.writeText(t.native),Ee.show(),I=setTimeout(()=>{I=null,Ee.close()},1500)}const Ut={onEmojiSelect:Ft,theme:"dark",dynamicWidth:!0},Nt=new ae(Ut);document.body.appendChild(Nt);
+`;let I=null;const Ee=document.querySelector("#copied-dialog");async function Ft(t){I&&clearTimeout(I),await navigator.clipboard.writeText(t.native),Ee.show(),I=setTimeout(()=>{I=null,Ee.close()},1500)}const Ut={onEmojiSelect:Ft,theme:"dark",autoFocus:!0,emojiButtonSize:36*2,emojiSize:24*2,dynamicWidth:!0},Nt=new ae(Ut);document.body.appendChild(Nt);
