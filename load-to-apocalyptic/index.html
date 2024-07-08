@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>load to apocalyptic</title>
+    <style>
+        .hidden {
+            display: none;
+        }
+
+        #loading {
+            animation: 1s ease-in-out infinite normal light-and-dark;
+        }
+
+        @keyframes light-and-dark {
+            0% {
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>終末世界への道は善意で舗装されているのかも</h1>
+    <h2>以下にいい感じの終末世界への道を実装するのでよく見ろ</h2>
+    <main>
+        <section>
+            <ul id="history"></ul>
+            <p id="loading" class="hidden">・・・・・・</li>
+        </section>
+        <section>
+            <input type="text" id="prompt">
+            <button type="button" id="call-prompt">送信</button>
+        </section>
+    </main>
+    <script src="./app.js"></script>
+</body>
+</html>
