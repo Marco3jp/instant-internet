@@ -36,6 +36,9 @@ export default <ProjectConfig>{
             distDir: "dist"
         },
         {
+            dir: "load-to-apocalyptic",
+        },
+        {
             dir: "test-for-with-bundler",
             commands: [
                 {
