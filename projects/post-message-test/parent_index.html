@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<pre id="logger"></pre>
+<iframe src="./child_index.html" id="child"></iframe>
+<script>
+    const child = document.querySelector("#child")
+
+    if (child instanceof HTMLIFrameElement) {
+        window.addEventListener("message", (e) => {
+            console.log("onMessage", performance.now())
+            console.log(e)
+        })
+    }
+
+    function sendMessage(msg) {
+        console.log("sendMessage", performance.now())
+        child.contentWindow.postMessage(msg, "*")
+    }
+
+    window.addEventListener("keydown", () => {
+        sendMessage("ping")
+    })
+</script>
+</body>
+</html>
