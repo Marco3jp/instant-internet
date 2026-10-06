@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Markdown Table Prettifier</title>
+<style>
+  :root {
+    --bg: #1e1e2e;
+    --panel: #282838;
+    --fg: #e4e4ef;
+    --muted: #8a8aa3;
+    --accent: #f5a3c7;
+    --border: #3a3a52;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 20px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100vh;
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    color: var(--accent);
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 70vh;
+  }
+  .panel header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel header span { font-weight: 600; font-size: 13px; }
+  textarea, pre {
+    flex: 1;
+    margin: 0;
+    padding: 14px;
+    background: transparent;
+    color: var(--fg);
+    border: 0;
+    outline: 0;
+    resize: none;
+    font-family: "Osaka-Mono", "HackGen Console", "Source Han Mono", "Noto Sans Mono CJK JP", "BIZ UDGothic", "MS Gothic", "ＭＳ ゴシック", Menlo, Consolas, "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre;
+    overflow: auto;
+    font-feature-settings: "palt" 0, "halt" 0;
+    font-kerning: none;
+  }
+  .controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  button, select {
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  label { font-size: 12px; color: var(--muted); }
+  .err {
+    color: #ff8888;
+    padding: 8px 14px;
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+  .err.show { display: block; }
+  @media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <h1>Markdown Table Prettifier</h1>
+  <div class="sub">左にMarkdownの表を貼り付けたら、右に整形した版が出るわよ。</div>
+
+  <div class="grid">
+    <div class="panel">
+      <header>
+        <span>Input (Markdown)</span>
+        <div class="controls">
+          <button id="sample">サンプル挿入</button>
+          <button id="clear">クリア</button>
+        </div>
+      </header>
+      <textarea id="input" spellcheck="false" placeholder="| col1 | col2 |&#10;| --- | --- |&#10;| a | b |"></textarea>
+    </div>
+
+    <div class="panel">
+      <header>
+        <span>Output (Pretty)</span>
+        <div class="controls">
+          <label>style:
+            <select id="style">
+              <option value="ascii">ASCII (+---+)</option>
+              <option value="box" selected>Box (┌─┬─┐)</option>
+              <option value="rounded">Rounded (╭─┬─╮)</option>
+              <option value="double">Double (╔═╦═╗)</option>
+              <option value="md">Markdown (|---|)</option>
+            </select>
+          </label>
+          <button id="copy">コピー</button>
+        </div>
+      </header>
+      <pre id="output"></pre>
+      <div class="err" id="err"></div>
+    </div>
+  </div>
+
+<script>
+const STYLES = {
+  ascii:   { tl:'+', tm:'+', tr:'+', ml:'+', mm:'+', mr:'+', bl:'+', bm:'+', br:'+', h:'-', v:'|', hh:'=' },
+  box:     { tl:'┌', tm:'┬', tr:'┐', ml:'├', mm:'┼', mr:'┤', bl:'└', bm:'┴', br:'┘', h:'─', v:'│', hh:'═' },
+  rounded: { tl:'╭', tm:'┬', tr:'╮', ml:'├', mm:'┼', mr:'┤', bl:'╰', bm:'┴', br:'╯', h:'─', v:'│', hh:'═' },
+  double:  { tl:'╔', tm:'╦', tr:'╗', ml:'╠', mm:'╬', mr:'╣', bl:'╚', bm:'╩', br:'╝', h:'═', v:'║', hh:'═' },
+};
+
+function displayWidth(str) {
+  let w = 0;
+  for (const ch of str) {
+    const code = ch.codePointAt(0);
+    if (code < 0x20) continue;
+    if (
+      (code >= 0x1100 && code <= 0x115F) ||
+      (code >= 0x2E80 && code <= 0x303E) ||
+      (code >= 0x3041 && code <= 0x33FF) ||
+      (code >= 0x3400 && code <= 0x4DBF) ||
+      (code >= 0x4E00 && code <= 0x9FFF) ||
+      (code >= 0xA000 && code <= 0xA4CF) ||
+      (code >= 0xAC00 && code <= 0xD7A3) ||
+      (code >= 0xF900 && code <= 0xFAFF) ||
+      (code >= 0xFE30 && code <= 0xFE4F) ||
+      (code >= 0xFF00 && code <= 0xFF60) ||
+      (code >= 0xFFE0 && code <= 0xFFE6) ||
+      (code >= 0x20000 && code <= 0x2FFFD) ||
+      (code >= 0x30000 && code <= 0x3FFFD)
+    ) {
+      w += 2;
+    } else {
+      w += 1;
+    }
+  }
+  return w;
+}
+
+function splitRow(line) {
+  let s = line.trim();
+  if (s.startsWith('|')) s = s.slice(1);
+  if (s.endsWith('|')) s = s.slice(0, -1);
+  const cells = [];
+  let buf = '';
+  let escaped = false;
+  for (const ch of s) {
+    if (escaped) { buf += ch; escaped = false; continue; }
+    if (ch === '\\') { escaped = true; buf += ch; continue; }
+    if (ch === '|') { cells.push(buf.trim()); buf = ''; continue; }
+    buf += ch;
+  }
+  cells.push(buf.trim());
+  return cells;
+}
+
+function parseAlign(cell) {
+  const s = cell.trim();
+  if (!/^:?-+:?$/.test(s)) return null;
+  const left = s.startsWith(':');
+  const right = s.endsWith(':');
+  if (left && right) return 'center';
+  if (right) return 'right';
+  if (left) return 'left';
+  return 'default';
+}
+
+function parseTable(src) {
+  const lines = src.split(/\r?\n/).map(l => l).filter(l => l.includes('|'));
+  if (lines.length < 2) throw new Error('表が見つからないわよ。最低でもヘッダと区切り行が要るの');
+  const header = splitRow(lines[0]);
+  const sepCells = splitRow(lines[1]);
+  const aligns = sepCells.map(parseAlign);
+  if (aligns.some(a => a === null)) throw new Error('2行目が区切り行になってないわよ（例: | --- | :---: |）');
+  const rows = lines.slice(2).map(splitRow);
+  const colCount = header.length;
+  for (const r of rows) {
+    while (r.length < colCount) r.push('');
+    if (r.length > colCount) r.length = colCount;
+  }
+  return { header, aligns, rows };
+}
+
+function pad(text, width, align) {
+  const w = displayWidth(text);
+  const space = Math.max(0, width - w);
+  if (align === 'right') return ' '.repeat(space) + text;
+  if (align === 'center') {
+    const l = Math.floor(space / 2);
+    const r = space - l;
+    return ' '.repeat(l) + text + ' '.repeat(r);
+  }
+  return text + ' '.repeat(space);
+}
+
+function renderMarkdown(table) {
+  const { header, aligns, rows } = table;
+  const widths = header.map((h, i) => {
+    let w = displayWidth(h);
+    for (const r of rows) w = Math.max(w, displayWidth(r[i] || ''));
+    const sep = aligns[i] === 'center' ? 5 : (aligns[i] === 'left' || aligns[i] === 'right') ? 4 : 3;
+    return Math.max(w, sep);
+  });
+  const sepFor = (i) => {
+    const w = widths[i];
+    const a = aligns[i];
+    if (a === 'center') return ':' + '-'.repeat(w - 2) + ':';
+    if (a === 'left')   return ':' + '-'.repeat(w - 1);
+    if (a === 'right')  return '-'.repeat(w - 1) + ':';
+    return '-'.repeat(w);
+  };
+  const fmtRow = (cells) =>
+    '| ' + cells.map((c, i) => pad(c || '', widths[i], aligns[i] === 'default' ? 'left' : aligns[i])).join(' | ') + ' |';
+  const out = [];
+  out.push(fmtRow(header));
+  out.push('| ' + widths.map((_, i) => sepFor(i)).join(' | ') + ' |');
+  for (const r of rows) out.push(fmtRow(r));
+  return out.join('\n');
+}
+
+function splitLines(cell) {
+  return (cell || '').split(/<br\s*\/?>/i).map(s => s.trim());
+}
+
+function renderBox(table, styleKey) {
+  const S = STYLES[styleKey];
+  const { header, aligns, rows } = table;
+  const headerLines = header.map(splitLines);
+  const headerHeight = Math.max(...headerLines.map(ls => ls.length));
+  const widths = header.map((_, i) => {
+    let w = Math.max(...headerLines[i].map(displayWidth));
+    for (const r of rows) w = Math.max(w, displayWidth(r[i] || ''));
+    return w;
+  });
+
+  const line = (l, m, r, h) =>
+    l + widths.map(w => h.repeat(w + 2)).join(m) + r;
+
+  const row = (cells) =>
+    S.v + cells.map((c, i) => ' ' + pad(c || '', widths[i], aligns[i] === 'default' ? 'left' : aligns[i]) + ' ').join(S.v) + S.v;
+
+  const out = [];
+  out.push(line(S.tl, S.tm, S.tr, S.h));
+  for (let k = 0; k < headerHeight; k++) out.push(row(headerLines.map(ls => ls[k] || '')));
+  out.push(line(S.ml, S.mm, S.mr, S.h));
+  for (const r of rows) out.push(row(r));
+  out.push(line(S.bl, S.bm, S.br, S.h));
+  return out.join('\n');
+}
+
+const $in = document.getElementById('input');
+const $out = document.getElementById('output');
+const $err = document.getElementById('err');
+const $style = document.getElementById('style');
+
+function run() {
+  const src = $in.value;
+  $err.classList.remove('show');
+  $err.textContent = '';
+  if (!src.trim()) { $out.textContent = ''; return; }
+  try {
+    const table = parseTable(src);
+    const style = $style.value;
+    $out.textContent = style === 'md' ? renderMarkdown(table) : renderBox(table, style);
+  } catch (e) {
+    $out.textContent = '';
+    $err.textContent = e.message;
+    $err.classList.add('show');
+  }
+}
+
+$in.addEventListener('input', run);
+$style.addEventListener('change', run);
+
+document.getElementById('clear').addEventListener('click', () => { $in.value = ''; run(); });
+document.getElementById('sample').addEventListener('click', () => {
+  $in.value = [
+    '| 名前 | 年齢 | 得意分野 |',
+    '| :--- | ---: | :---: |',
+    '| 桜井 | 17 | フロントエンド |',
+    '| Alice | 24 | バックエンド |',
+    '| 山田太郎 | 30 | インフラ |',
+  ].join('\n');
+  run();
+});
+document.getElementById('copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($out.textContent);
+    const btn = document.getElementById('copy');
+    const old = btn.textContent;
+    btn.textContent = 'コピーした';
+    setTimeout(() => btn.textContent = old, 1200);
+  } catch {}
+});
+
+run();
+</script>
+</body>
+</html>
+
