@@ -55,6 +55,9 @@ export default <ProjectConfig>{
         {
             // HTMLファイルをコピーする系のテストプロジェクト
             dir: "test-for-vanilla-frontend",
+        },
+        {
+            dir: "md-table-prettify",
         }
     ]
 }
