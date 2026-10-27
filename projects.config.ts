@@ -58,6 +58,9 @@ export default <ProjectConfig>{
         },
         {
             dir: "md-table-prettify",
+        },
+        {
+            dir: "composer-map",
         }
     ]
 }
