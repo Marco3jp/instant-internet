@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Composer Atlas</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --fg: #22212a;
+    --muted: #6d6b78;
+    --border: #e0ddd5;
+    --accent: #b5476b;
+    --chip: #efece5;
+    --shadow: 0 2px 12px rgba(0, 0, 0, .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17161d;
+      --panel: #211f29;
+      --fg: #e9e7f0;
+      --muted: #9a97a8;
+      --border: #35323f;
+      --accent: #f08aae;
+      --chip: #2c2a36;
+      --shadow: 0 2px 12px rgba(0, 0, 0, .4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
+  }
+  button, select, input { font: inherit; color: inherit; }
+  button {
+    background: var(--chip);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  select {
+    background: var(--chip);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 6px;
+    font-size: 12px;
+  }
+
+  /* ───── header ───── */
+  header.top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex-wrap: wrap;
+  }
+  header.top h1 {
+    margin: 0;
+    font-size: 17px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  header.top .sub { font-size: 11px; color: var(--muted); }
+  .eras { display: flex; gap: 6px; flex-wrap: wrap; }
+  .era-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    border-radius: 999px; padding: 3px 10px;
+  }
+  .era-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); display: inline-block; }
+  .era-chip.off { opacity: .4; }
+  .search { margin-left: auto; position: relative; }
+  .search input {
+    background: var(--chip);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    width: 220px;
+  }
+  .search-results {
+    position: absolute; right: 0; top: 34px; z-index: 1200;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: var(--shadow);
+    width: 300px; max-height: 360px; overflow: auto; display: none;
+  }
+  .search-results.show { display: block; }
+  .search-results div { padding: 7px 12px; font-size: 13px; cursor: pointer; }
+  .search-results div:hover, .search-results div.active { background: var(--chip); }
+  .search-results small { color: var(--muted); display: block; font-size: 11px; }
+
+  /* ───── main ───── */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    min-height: 0;
+  }
+  #map { min-height: 0; background: var(--bg); }
+  .regions {
+    position: absolute; top: 10px; left: 54px; z-index: 900;
+    display: flex; gap: 4px; flex-wrap: wrap; max-width: calc(100% - 120px);
+  }
+  .regions button { background: var(--panel); box-shadow: var(--shadow); }
+  .regions button.active { border-color: var(--accent); color: var(--accent); }
+  .map-wrap { position: relative; min-height: 0; display: flex; }
+  .map-wrap #map { flex: 1; }
+  .year-badge {
+    position: absolute; bottom: 14px; left: 14px; z-index: 900;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 6px 14px; box-shadow: var(--shadow); pointer-events: none;
+  }
+  .year-badge b { font-size: 28px; font-variant-numeric: tabular-nums; }
+  .year-badge span { font-size: 12px; color: var(--muted); margin-left: 6px; }
+
+  aside {
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .tabs button {
+    flex: 1; border: 0; border-radius: 0; background: transparent;
+    padding: 10px; font-size: 13px; border-bottom: 2px solid transparent;
+  }
+  .tabs button.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .pane { flex: 1; overflow: auto; display: none; }
+  .pane.active { display: block; }
+
+  .list-item {
+    display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center;
+    padding: 9px 14px; border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .list-item:hover { background: var(--chip); }
+  .list-item.sel { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); }
+  .list-item i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+  .list-item .nm { font-size: 14px; }
+  .list-item .meta { font-size: 11px; color: var(--muted); }
+  .list-item .age { font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; }
+  .empty { padding: 30px 16px; color: var(--muted); font-size: 13px; text-align: center; line-height: 1.8; }
+  .list-head { padding: 8px 14px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+
+  .detail { padding: 16px; }
+  .detail h2 { margin: 0; font-size: 20px; }
+  .detail .orig { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .detail .dates { margin-top: 8px; font-size: 13px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; color: #fff; background: var(--c); }
+  .detail p.bio { font-size: 13px; line-height: 1.8; }
+  .detail h3 { font-size: 13px; margin: 18px 0 8px; color: var(--muted); letter-spacing: .05em; }
+  .links { display: flex; gap: 6px; flex-wrap: wrap; }
+  .links a {
+    font-size: 11px; text-decoration: none; color: var(--fg);
+    background: var(--chip); border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px;
+  }
+  .links a:hover { border-color: var(--accent); color: var(--accent); }
+  ol.places { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--border); margin-left: 6px; }
+  ol.places li { position: relative; padding: 3px 0 3px 14px; font-size: 13px; cursor: pointer; }
+  ol.places li::before {
+    content: ""; position: absolute; left: -6px; top: 9px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--panel); border: 2px solid var(--c);
+  }
+  ol.places li.now::before { background: var(--c); }
+  ol.places li.now { font-weight: 600; }
+  ol.places li:hover { color: var(--accent); }
+  ol.places .yr { display: inline-block; width: 46px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  details.work { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: var(--bg); }
+  details.work summary { padding: 9px 12px; cursor: pointer; font-size: 14px; list-style: none; display: flex; justify-content: space-between; gap: 8px; }
+  details.work summary::-webkit-details-marker { display: none; }
+  details.work summary .y { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  details.work[open] summary { border-bottom: 1px solid var(--border); }
+  details.work .body { padding: 10px 12px; font-size: 13px; line-height: 1.7; }
+  details.work .wo { color: var(--muted); font-size: 12px; font-style: italic; }
+  .rec { border-top: 1px dashed var(--border); padding: 8px 0 4px; }
+  .rec .who { font-size: 13px; }
+  .rec .when { font-size: 11px; color: var(--muted); margin: 2px 0 5px; }
+  .rec-label { font-size: 11px; color: var(--muted); margin: 10px 0 2px; font-weight: 600; }
+  .note { font-size: 11px; color: var(--muted); line-height: 1.6; margin-top: 18px; }
+
+  /* ───── timeline ───── */
+  footer.timeline {
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    padding: 8px 14px 10px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: center;
+  }
+  .tl-controls { display: flex; gap: 6px; align-items: center; }
+  .tl-controls button.play { width: 38px; font-size: 14px; }
+  .tl-track { position: relative; height: 54px; }
+  .tl-track svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .tl-track input[type=range] {
+    position: absolute; left: 0; right: 0; bottom: 0; width: 100%; margin: 0;
+    -webkit-appearance: none; appearance: none; background: transparent; height: 54px; cursor: pointer;
+  }
+  .tl-track input[type=range]::-webkit-slider-runnable-track { height: 54px; background: transparent; }
+  .tl-track input[type=range]::-moz-range-track { height: 54px; background: transparent; }
+  .tl-track input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 3px; height: 54px; background: var(--accent); border: 0; border-radius: 2px;
+  }
+  .tl-track input[type=range]::-moz-range-thumb { width: 3px; height: 54px; background: var(--accent); border: 0; border-radius: 2px; }
+  .tl-track input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tl-opts { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+
+  /* ───── map markers ───── */
+  .cm-pin { display: flex; align-items: center; gap: 4px; white-space: nowrap; transform: translate(-7px, -7px); }
+  .cm-pin .dot {
+    width: 14px; height: 14px; border-radius: 50%; background: var(--c);
+    border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25);
+    flex: none;
+  }
+  .cm-pin .lbl {
+    font-size: 11px; padding: 1px 6px; border-radius: 4px;
+    background: rgba(255,255,255,.92); color: #222; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    display: none;
+  }
+  .show-labels .cm-pin .lbl { display: inline-block; }
+  .cm-pin.sel .dot { width: 18px; height: 18px; box-shadow: 0 0 0 3px var(--accent); }
+  .cm-pin.sel .lbl { display: inline-block; font-weight: 700; }
+  .cm-cluster {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: grid; place-items: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,.35);
+  }
+  .cm-cluster span {
+    width: 26px; height: 26px; border-radius: 50%; background: #fff; color: #222;
+    display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  }
+  .path-label {
+    background: rgba(255,255,255,.92) !important; color: #222 !important; border: 0 !important;
+    font-size: 10px !important; padding: 1px 5px !important; box-shadow: 0 1px 3px rgba(0,0,0,.2) !important;
+  }
+  .path-label::before { display: none; }
+  .leaflet-container { font-family: inherit; }
+
+  /* ───── mobile ───── */
+  @media (max-width: 860px) {
+    header.top { padding: 8px 12px; gap: 8px; }
+    header.top .sub { display: none; }
+    .search { margin-left: 0; flex: 1; }
+    .search input { width: 100%; }
+    .search-results { width: 100%; }
+    main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 36vh; }
+    header.top > * { min-width: 0; }
+    .eras { flex-wrap: nowrap; overflow-x: auto; width: 100%; }
+    .search { width: 100%; }
+    footer.timeline > * { min-width: 0; }
+    .era-chip { white-space: nowrap; }
+    .year-badge { bottom: 8px; left: 8px; padding: 3px 10px; }
+    aside { border-left: 0; border-top: 1px solid var(--border); }
+    .regions { left: 50px; max-width: calc(100% - 60px); overflow-x: auto; flex-wrap: nowrap; }
+    .regions button { white-space: nowrap; }
+    footer.timeline { grid-template-columns: 1fr; gap: 6px; padding: 8px 12px; }
+    .tl-controls, .tl-opts { justify-content: space-between; }
+    .year-badge b { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Composer Atlas</h1>
+      <div class="sub">作曲家たちがその年どこにいたか、時代をまたいで見られる地図よ</div>
+    </div>
+    <div class="eras" id="eras"></div>
+    <div class="search">
+      <input id="search" type="search" placeholder="作曲家・作品名で検索" autocomplete="off">
+      <div class="search-results" id="search-results"></div>
+    </div>
+  </header>
+
+  <main>
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="regions" id="regions"></div>
+      <div class="year-badge"><b id="year-big">1830</b><span id="year-count"></span></div>
+    </div>
+    <aside>
+      <div class="tabs">
+        <button data-tab="list" class="active" id="tab-list">一覧</button>
+        <button data-tab="detail" id="tab-detail">詳細</button>
+      </div>
+      <div class="pane active" id="pane-list"></div>
+      <div class="pane" id="pane-detail">
+        <div class="empty">地図のピンか一覧から作曲家を選んで。<br>代表作と、聴いてほしい録音を出してあげる。</div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="timeline">
+    <div class="tl-controls">
+      <button class="play" id="play" title="再生 / 停止 (Space)">▶</button>
+      <select id="speed" title="再生速度">
+        <option value="250">遅い</option>
+        <option value="120" selected>普通</option>
+        <option value="40">速い</option>
+      </select>
+      <button id="prev" title="10年戻る">−10</button>
+      <button id="next" title="10年進む">+10</button>
+    </div>
+    <div class="tl-track">
+      <svg id="tl-svg" preserveAspectRatio="none"></svg>
+      <input type="range" id="year" min="1440" max="2000" step="1" value="1830" aria-label="年">
+    </div>
+    <div class="tl-opts">
+      <label>表示
+        <select id="window">
+          <option value="0" selected>その年に存命</option>
+          <option value="10">前後10年</option>
+          <option value="25">前後25年</option>
+          <option value="all">全員（主な拠点）</option>
+        </select>
+      </label>
+    </div>
+  </footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="./data.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
