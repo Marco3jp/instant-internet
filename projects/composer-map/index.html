@@ -246,6 +246,9 @@
   }
   .path-label::before { display: none; }
   .leaflet-container { font-family: inherit; }
+  @media (prefers-color-scheme: dark) {
+    .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.85); }
+  }
 
   /* ───── mobile ───── */
   @media (max-width: 860px) {

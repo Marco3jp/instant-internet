@@ -93,19 +93,11 @@ function jitter(id) {
 
 const map = L.map("map", { zoomControl: true, worldCopyJump: true, minZoom: 2 }).fitBounds(REGIONS[1].bounds);
 
-const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
-let tileLayer = null;
-function setTiles() {
-  if (tileLayer) map.removeLayer(tileLayer);
-  const style = darkQuery.matches ? "dark_all" : "rastertiles/voyager";
-  tileLayer = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: "abcd",
-    maxZoom: 18,
-  }).addTo(map);
-}
-setTiles();
-darkQuery.addEventListener("change", setTiles);
+// OpenStreetMap 公式タイル（APIキー不要）。ダークモードは CSS のフィルターで暗くする
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom: 19,
+}).addTo(map);
 
 const cluster = L.markerClusterGroup({
   maxClusterRadius: 38,
