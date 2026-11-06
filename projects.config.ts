@@ -61,6 +61,9 @@ export default <ProjectConfig>{
         },
         {
             dir: "composer-map",
+        },
+        {
+            dir: "kait-bus-2026",
         }
     ]
 }
