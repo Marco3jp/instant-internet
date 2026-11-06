@@ -102,18 +102,27 @@
 </head>
 <body>
   <h1>Markdown Table Prettifier</h1>
-  <div class="sub">左にMarkdownの表を貼り付けたら、右に整形した版が出るわよ。</div>
+  <div class="sub">左にMarkdownの表か、スプレッドシートからコピーしたセルを貼り付けたら、右に整形した版が出るわよ。スプレッドシートは1行目をヘッダとして扱うからね。</div>
 
   <div class="grid">
     <div class="panel">
       <header>
-        <span>Input (Markdown)</span>
+        <span>Input</span>
         <div class="controls">
+          <label>形式:
+            <select id="format">
+              <option value="auto" selected>自動</option>
+              <option value="md">Markdown</option>
+              <option value="tsv">スプレッドシート</option>
+            </select>
+          </label>
+          <label id="detected"></label>
           <button id="sample">サンプル挿入</button>
+          <button id="sample-tsv">サンプル（スプレッドシート）</button>
           <button id="clear">クリア</button>
         </div>
       </header>
-      <textarea id="input" spellcheck="false" placeholder="| col1 | col2 |&#10;| --- | --- |&#10;| a | b |"></textarea>
+      <textarea id="input" spellcheck="false" placeholder="| col1 | col2 |&#10;| --- | --- |&#10;| a | b |&#10;&#10;スプレッドシートのセルをそのまま貼り付けてもいいわよ"></textarea>
     </div>
 
     <div class="panel">
@@ -173,21 +182,23 @@ function displayWidth(str) {
   return w;
 }
 
+// セルは「\| を | に戻し、<br> を \n にした」素の文字列で持つ。出力側で形式ごとに戻す
 function splitRow(line) {
   let s = line.trim();
   if (s.startsWith('|')) s = s.slice(1);
-  if (s.endsWith('|')) s = s.slice(0, -1);
+  if (s.endsWith('|') && !s.endsWith('\\|')) s = s.slice(0, -1);
   const cells = [];
   let buf = '';
   let escaped = false;
   for (const ch of s) {
-    if (escaped) { buf += ch; escaped = false; continue; }
-    if (ch === '\\') { escaped = true; buf += ch; continue; }
-    if (ch === '|') { cells.push(buf.trim()); buf = ''; continue; }
+    if (escaped) { buf += ch === '|' ? '|' : '\\' + ch; escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (ch === '|') { cells.push(buf); buf = ''; continue; }
     buf += ch;
   }
-  cells.push(buf.trim());
-  return cells;
+  if (escaped) buf += '\\';
+  cells.push(buf);
+  return cells.map(c => c.split(/<br\s*\/?>/i).map(s => s.trim()).join('\n'));
 }
 
 function parseAlign(cell) {
@@ -201,8 +212,74 @@ function parseAlign(cell) {
   return 'default';
 }
 
+function pipeLines(src) {
+  return src.split(/\r?\n/).filter(l => l.includes('|'));
+}
+
+function detectFormat(src) {
+  const lines = pipeLines(src);
+  if (lines.length >= 2 && splitRow(lines[1]).every(c => parseAlign(c) !== null)) return 'md';
+  // タブが無く | を含む行があるなら、区切り行を書き忘れた Markdown とみなしてエラーを出す
+  if (!src.includes('\t') && lines.length > 0) return 'md';
+  return 'tsv';
+}
+
+// スプレッドシートからコピーした文字列は TSV になる。
+// 改行・タブ・" を含むセルは "..." で囲まれ、中の " は "" になる
+function parseTsvRows(src) {
+  const n = src.length;
+  const isBreak = (ch) => ch === '\t' || ch === '\n' || ch === '\r';
+  const rows = [[]];
+  let i = 0;
+  for (;;) {
+    let value = null;
+    let end = i;
+    if (src[i] === '"') {
+      let buf = '';
+      let j = i + 1;
+      while (j < n) {
+        if (src[j] === '"') {
+          if (src[j + 1] === '"') { buf += '"'; j += 2; continue; }
+          break;
+        }
+        buf += src[j];
+        j++;
+      }
+      // 閉じの " の直後がセルや行の区切りでなければ、"から始まるだけの普通のセルとして読み直す
+      if (j < n && (j + 1 >= n || isBreak(src[j + 1]))) {
+        value = buf.replace(/\r\n?/g, '\n');
+        end = j + 1;
+      }
+    }
+    if (value === null) {
+      while (end < n && !isBreak(src[end])) end++;
+      value = src.slice(i, end);
+    }
+    rows[rows.length - 1].push(value);
+    if (end >= n) break;
+    if (src[end] === '\t') { i = end + 1; continue; }
+    i = end + (src[end] === '\r' && src[end + 1] === '\n' ? 2 : 1);
+    if (i >= n) break;
+    rows.push([]);
+  }
+  while (rows.length > 0 && rows[rows.length - 1].every(c => c === '')) rows.pop();
+  return rows;
+}
+
+function parseTsv(src) {
+  const rows = parseTsvRows(src);
+  if (rows.length < 1) throw new Error('セルが見つからないわよ');
+  const colCount = Math.max(...rows.map(r => r.length));
+  for (const r of rows) while (r.length < colCount) r.push('');
+  return {
+    header: rows[0],
+    aligns: rows[0].map(() => 'default'),
+    rows: rows.slice(1),
+  };
+}
+
 function parseTable(src) {
-  const lines = src.split(/\r?\n/).map(l => l).filter(l => l.includes('|'));
+  const lines = pipeLines(src);
   if (lines.length < 2) throw new Error('表が見つからないわよ。最低でもヘッダと区切り行が要るの');
   const header = splitRow(lines[0]);
   const sepCells = splitRow(lines[1]);
@@ -229,8 +306,14 @@ function pad(text, width, align) {
   return text + ' '.repeat(space);
 }
 
+function toMarkdownCell(text) {
+  return (text || '').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>');
+}
+
 function renderMarkdown(table) {
-  const { header, aligns, rows } = table;
+  const { aligns } = table;
+  const header = table.header.map(toMarkdownCell);
+  const rows = table.rows.map(r => r.map(toMarkdownCell));
   const widths = header.map((h, i) => {
     let w = displayWidth(h);
     for (const r of rows) w = Math.max(w, displayWidth(r[i] || ''));
@@ -254,32 +337,44 @@ function renderMarkdown(table) {
   return out.join('\n');
 }
 
+// タブは displayWidth で幅0になり罫線がずれるので、空白に置き換えて描く
 function splitLines(cell) {
-  return (cell || '').split(/<br\s*\/?>/i).map(s => s.trim());
+  return (cell || '').replace(/\t/g, ' ').split(/\r?\n/);
 }
 
 function renderBox(table, styleKey) {
   const S = STYLES[styleKey];
-  const { header, aligns, rows } = table;
-  const headerLines = header.map(splitLines);
-  const headerHeight = Math.max(...headerLines.map(ls => ls.length));
-  const widths = header.map((_, i) => {
-    let w = Math.max(...headerLines[i].map(displayWidth));
-    for (const r of rows) w = Math.max(w, displayWidth(r[i] || ''));
+  const { aligns } = table;
+  const header = table.header.map(splitLines);
+  const rows = table.rows.map(r => r.map(splitLines));
+  const widths = header.map((h, i) => {
+    let w = Math.max(...h.map(displayWidth));
+    for (const r of rows) w = Math.max(w, ...(r[i] || ['']).map(displayWidth));
     return w;
   });
+  // 本文に複数行のセルがあると行の切れ目が見えなくなるので、そのときは行の間にも罫線を引く
+  const hasMultiline = rows.some(r => r.some(ls => ls.length > 1));
 
   const line = (l, m, r, h) =>
     l + widths.map(w => h.repeat(w + 2)).join(m) + r;
 
-  const row = (cells) =>
-    S.v + cells.map((c, i) => ' ' + pad(c || '', widths[i], aligns[i] === 'default' ? 'left' : aligns[i]) + ' ').join(S.v) + S.v;
+  const row = (cells) => {
+    const height = Math.max(...cells.map(ls => ls.length));
+    const out = [];
+    for (let k = 0; k < height; k++) {
+      out.push(S.v + cells.map((ls, i) => ' ' + pad(ls[k] || '', widths[i], aligns[i] === 'default' ? 'left' : aligns[i]) + ' ').join(S.v) + S.v);
+    }
+    return out;
+  };
 
   const out = [];
   out.push(line(S.tl, S.tm, S.tr, S.h));
-  for (let k = 0; k < headerHeight; k++) out.push(row(headerLines.map(ls => ls[k] || '')));
+  out.push(...row(header));
   out.push(line(S.ml, S.mm, S.mr, S.h));
-  for (const r of rows) out.push(row(r));
+  rows.forEach((r, idx) => {
+    if (idx > 0 && hasMultiline) out.push(line(S.ml, S.mm, S.mr, S.h));
+    out.push(...row(r));
+  });
   out.push(line(S.bl, S.bm, S.br, S.h));
   return out.join('\n');
 }
@@ -288,14 +383,24 @@ const $in = document.getElementById('input');
 const $out = document.getElementById('output');
 const $err = document.getElementById('err');
 const $style = document.getElementById('style');
+const $format = document.getElementById('format');
+const $detected = document.getElementById('detected');
+
+const FORMAT_LABELS = { md: 'Markdown', tsv: 'スプレッドシート' };
 
 function run() {
   const src = $in.value;
   $err.classList.remove('show');
   $err.textContent = '';
+  $detected.textContent = '';
   if (!src.trim()) { $out.textContent = ''; return; }
   try {
-    const table = parseTable(src);
+    let format = $format.value;
+    if (format === 'auto') {
+      format = detectFormat(src);
+      $detected.textContent = `→ ${FORMAT_LABELS[format]}として読んだわ`;
+    }
+    const table = format === 'md' ? parseTable(src) : parseTsv(src);
     const style = $style.value;
     $out.textContent = style === 'md' ? renderMarkdown(table) : renderBox(table, style);
   } catch (e) {
@@ -307,6 +412,7 @@ function run() {
 
 $in.addEventListener('input', run);
 $style.addEventListener('change', run);
+$format.addEventListener('change', run);
 
 document.getElementById('clear').addEventListener('click', () => { $in.value = ''; run(); });
 document.getElementById('sample').addEventListener('click', () => {
@@ -317,6 +423,15 @@ document.getElementById('sample').addEventListener('click', () => {
     '| Alice | 24 | バックエンド |',
     '| 山田太郎 | 30 | インフラ |',
   ].join('\n');
+  run();
+});
+document.getElementById('sample-tsv').addEventListener('click', () => {
+  $in.value = [
+    ['名前', '年齢', 'メモ'],
+    ['桜井', '17', '"フロントエンド\n""React"" が好き"'],
+    ['Alice', '24', 'バックエンド'],
+    ['山田太郎', '30', '"インフラ\nTerraform\nAWS"'],
+  ].map(r => r.join('\t')).join('\n');
   run();
 });
 document.getElementById('copy').addEventListener('click', async () => {
