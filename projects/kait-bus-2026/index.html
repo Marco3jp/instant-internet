@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>幾徳祭バス 2026</title>
+<meta name="description" content="第51回幾徳祭（2026年11月7日・8日）に、今から向かうならどのバスに乗ればいいかを教えてくれるページ">
+<meta name="theme-color" content="#8BC34A">
+<style>
+  :root {
+    --bg: #fafaf7;
+    --fg: #212121;
+    --muted: #6b6b6b;
+    --line: #212121;
+    --soft: #e7e7e2;
+    --accent: #689f38;
+    --accent-bg: #eef6e3;
+    --extra: #d32f2f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151714;
+      --fg: #ecece8;
+      --muted: #a2a59d;
+      --line: #d8dbd2;
+      --soft: #2b2e29;
+      --accent: #9ccc65;
+      --accent-bg: #222b1b;
+      --extra: #ff6e6e;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100svh;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  main {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+  }
+  button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+
+  header { text-align: center; margin-bottom: 8px; }
+  header h1 { font-size: 15px; font-weight: 600; margin: 4px 0 10px; color: var(--muted); letter-spacing: .05em; }
+  #days { display: flex; justify-content: center; gap: 8px; }
+  #days button {
+    border: 2px solid var(--line);
+    background: transparent;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 14px;
+  }
+  #days button[aria-pressed="true"] { background: var(--line); color: var(--bg); }
+  #preview { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+
+  /* 1画面目: 行き / 帰り */
+  #first { display: flex; flex-direction: column; gap: 6vh; margin-top: 8vh; }
+  #first button {
+    width: 100%;
+    height: 24vh;
+    min-height: 120px;
+    border: 3px solid var(--line);
+    border-radius: 24px;
+    background: transparent;
+    font-size: clamp(40px, 10vh, 72px);
+    user-select: none;
+  }
+  #first button:active { background: var(--soft); }
+  #first small { display: block; font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+  /* 2画面目: 最速バス */
+  .bar { display: flex; align-items: center; margin-top: 8px; }
+  #back {
+    border: 0; background: transparent; padding: 8px 4px; font-size: 15px; color: var(--muted);
+  }
+  #mode { flex: 1; text-align: center; font-size: 22px; margin: 0; padding-right: 40px; }
+  hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0 0; }
+
+  #core {
+    width: min(86vw, 400px);
+    aspect-ratio: 1;
+    margin: 4vh auto 0;
+    border: 3px solid var(--line);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 4px;
+  }
+  #title { font-size: clamp(18px, 5.5vw, 24px); }
+  #time { font-size: clamp(56px, 20vw, 88px); font-variant-numeric: tabular-nums; line-height: 1.05; letter-spacing: .02em; }
+  #core.over #time { font-size: clamp(36px, 12vw, 52px); }
+  #inmin { font-size: clamp(20px, 6vw, 26px); }
+  #stop { font-size: clamp(18px, 5vw, 22px); }
+  #dest { font-size: 12px; color: var(--muted); max-width: 75%; }
+  #badge {
+    font-size: 12px; font-weight: 700; color: var(--extra);
+    border: 1.5px solid var(--extra); border-radius: 4px; padding: 0 6px;
+  }
+
+  #menu { display: flex; margin-top: 4vh; }
+  #from {
+    margin-left: auto;
+    width: 46%;
+    border: 3px solid var(--line);
+    border-right: 0;
+    border-radius: 24px 0 0 24px;
+    padding: 12px 8px;
+    background: transparent;
+    font-size: 20px;
+    line-height: 1.3;
+    user-select: none;
+  }
+  #from .current { display: block; font-size: 13px; color: var(--muted); }
+  /* 旧版と同じく、押すたびに濃くなって巡回していることがわかるようにする */
+  #from[data-step="1"] { background: var(--soft); }
+  #from[data-step="2"] { background: var(--accent-bg); }
+
+  #laterWrap { margin-top: 24px; }
+  h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 6px; }
+  #later { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--soft); }
+  #later li {
+    display: grid; grid-template-columns: 4.5em 1fr auto; gap: 8px;
+    padding: 8px 2px; border-bottom: 1px solid var(--soft); font-size: 15px;
+  }
+  #later .t { font-variant-numeric: tabular-nums; font-weight: 600; }
+  #later .k { color: var(--muted); font-size: 13px; }
+
+  details { margin-top: 20px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+  summary { cursor: pointer; color: var(--fg); }
+  dl { margin: 8px 0; }
+  dt { color: var(--fg); margin-top: 6px; }
+  dd { margin: 0 0 0 1em; }
+  ul.notes { padding-left: 1.2em; margin: 8px 0; }
+  a { color: var(--accent); word-break: break-all; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>第51回 幾徳祭 バス案内</h1>
+    <div id="days" role="group" aria-label="運行日"></div>
+    <p id="preview" hidden></p>
+  </header>
+
+  <section id="first">
+    <button id="go" type="button">行き<small>本厚木 → 大学</small></button>
+    <button id="return" type="button">帰り<small>大学 → 本厚木</small></button>
+  </section>
+
+  <section id="last" hidden>
+    <div class="bar">
+      <button id="back" type="button" aria-label="戻る">‹ 戻る</button>
+      <p id="mode"></p>
+    </div>
+    <hr>
+
+    <div id="core" aria-live="polite">
+      <div id="title">最速バス</div>
+      <div id="time"></div>
+      <div id="inmin"></div>
+      <span id="badge" hidden>臨時便</span>
+      <div id="stop"></div>
+      <div id="dest"></div>
+    </div>
+
+    <div id="menu">
+      <button id="from" type="button" data-step="0">乗り場変更<span class="current"></span></button>
+    </div>
+
+    <div id="laterWrap">
+      <h2>このあとの便</h2>
+      <ul id="later"></ul>
+    </div>
+
+    <details>
+      <summary>乗り場について</summary>
+      <dl id="stopNotes"></dl>
+    </details>
+  </section>
+
+  <details>
+    <summary>注意とデータの出典</summary>
+    <ul class="notes">
+      <li id="fare"></li>
+      <li>急行（厚67）は神奈中が発表した学園祭当日の予定時刻表（臨時便を含む）にもとづきます。道路状況で遅れることがあります。</li>
+      <li>路線バスは大学が公開している時刻表（2025年1月14日更新）の土曜・休日ダイヤです。2026年の厚木営業所のダイヤ改正は、この区間の土休日便を対象にしていません。</li>
+      <li>「荻野新宿」下車・徒歩7分のルート（上荻野車庫・半原・まつかげ台行など）は収録していません。</li>
+    </ul>
+    <ul class="notes">
+      <li><a href="https://www.kanachu.co.jp/news/2026/1031-611/" rel="noopener">神奈中: 厚67 臨時便の運行について（11/7,8）</a></li>
+      <li><a href="https://www.kait.jp/about/bus_timetable.pdf" rel="noopener">神奈川工科大学: 急行直通バス、路線バス時刻表</a></li>
+      <li><a href="https://www.kait.jp/directions/" rel="noopener">神奈川工科大学: 交通アクセス</a></li>
+      <li><a href="https://kait-circle.jp/jikkou/information.html#access" rel="noopener">幾徳祭: アクセス</a></li>
+    </ul>
+  </details>
+</main>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
