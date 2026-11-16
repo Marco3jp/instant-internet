@@ -64,6 +64,9 @@ export default <ProjectConfig>{
         },
         {
             dir: "kait-bus-2026",
+        },
+        {
+            dir: "qr-scanner",
         }
     ]
 }
