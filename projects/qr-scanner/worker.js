@@ -1,6 +1,13 @@
-import { prepareZXingModule, readBarcodes } from "https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.6/dist/es/reader/index.js";
+import { prepareZXingModule, readBarcodes } from "zxing-wasm/reader";
+import wasmUrl from "zxing-wasm/reader/zxing_reader.wasm?url";
 
-prepareZXingModule({ fireImmediately: true }).then(
+// 既定では jsDelivr から wasm を取りに行くので、ビルドに同梱したファイルを使わせる
+prepareZXingModule({
+  overrides: {
+    locateFile: (path, prefix) => (path.endsWith(".wasm") ? wasmUrl : prefix + path),
+  },
+  fireImmediately: true,
+}).then(
   () => postMessage({ type: "ready" }),
   (error) => postMessage({ type: "fatal", message: String(error?.message || error) }),
 );
