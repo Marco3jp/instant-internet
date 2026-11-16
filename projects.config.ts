@@ -64,6 +64,20 @@ export default <ProjectConfig>{
         },
         {
             dir: "kait-bus-2026",
+        },
+        {
+            dir: "qr-scanner",
+            commands: [
+                {
+                    exec: "npm",
+                    args: ["ci"]
+                },
+                {
+                    exec: "npm",
+                    args: ["run", "build", "--", "--base=/instant-internet/qr-scanner/"]
+                }
+            ],
+            distDir: "dist"
         }
     ]
 }

@@ -1,0 +1,17 @@
+{
+  "name": "qr-scanner",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "5.4.21"
+  },
+  "dependencies": {
+    "zxing-wasm": "3.1.6"
+  }
+}

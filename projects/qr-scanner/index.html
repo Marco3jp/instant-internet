@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QRコードリーダー</title>
+<meta name="description" content="カメラや画像からQRコードを読み取るページ。読み取りはすべて端末の中で行います">
+<meta name="theme-color" content="#111317">
+<style>
+  :root {
+    --bg: #f6f6f3;
+    --fg: #1d1f22;
+    --muted: #686c72;
+    --soft: #e4e4df;
+    --card: #ffffff;
+    --accent: #1f7a5a;
+    --accent-fg: #ffffff;
+    --danger: #c62828;
+    --viewer: #0b0c0e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111317;
+      --fg: #ebecee;
+      --muted: #9da2a9;
+      --soft: #2a2d33;
+      --card: #1a1d22;
+      --accent: #4cc797;
+      --accent-fg: #0b1f17;
+      --danger: #ff7a7a;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100svh;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif;
+    line-height: 1.5;
+    -webkit-tap-highlight-color: transparent;
+  }
+  main {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 12px 16px calc(32px + env(safe-area-inset-bottom));
+  }
+  button, select, input { font: inherit; color: inherit; }
+  button, .button { cursor: pointer; touch-action: manipulation; }
+  h1 { font-size: 16px; font-weight: 700; margin: 4px 0 10px; letter-spacing: .04em; }
+  h2 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0; }
+
+  .button, button.button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 40px; padding: 8px 14px;
+    border: 1.5px solid var(--soft); border-radius: 10px;
+    background: var(--card); color: var(--fg);
+    font-size: 14px; text-decoration: none; white-space: nowrap;
+  }
+  .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  .button.small { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+
+  /* カメラ */
+  #viewer {
+    position: relative;
+    height: min(58svh, 560px);
+    min-height: 280px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--viewer);
+    touch-action: manipulation;
+  }
+  #video, #overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #video { object-fit: cover; }
+  #viewer.mirrored #video, #viewer.mirrored #overlay { transform: scaleX(-1); }
+  #overlay { pointer-events: none; }
+  #guide {
+    position: absolute;
+    border: 3px solid rgba(255, 255, 255, .92);
+    border-radius: 18px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, .32);
+    pointer-events: none;
+    transition: border-color .15s;
+  }
+  #viewer.hit #guide { border-color: #4cc797; }
+  #start-panel {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    padding: 24px; text-align: center; color: #e9eaec; font-size: 14px;
+    background: var(--viewer);
+  }
+  #start-panel p { margin: 0; color: #a9adb3; }
+  #cam-controls {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, .55));
+    color: #fff;
+  }
+  #cam-controls button, #cam-controls select {
+    min-height: 36px; padding: 4px 12px;
+    border: 1px solid rgba(255, 255, 255, .45); border-radius: 999px;
+    background: rgba(0, 0, 0, .35); color: #fff; font-size: 13px;
+  }
+  #cam-controls select { max-width: 40%; margin-left: auto; }
+  #torch[aria-pressed="true"] { background: #fff; color: #111; }
+  #zoom-wrap { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; font-size: 12px; }
+  #zoom { flex: 1; min-width: 60px; accent-color: #fff; }
+
+  #status { min-height: 1.5em; margin: 8px 2px 0; font-size: 13px; color: var(--muted); }
+  #status.error { color: var(--danger); }
+  #hint { margin: 2px 2px 0; font-size: 13px; color: var(--fg); }
+
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .sub { margin: 6px 2px 0; font-size: 12px; color: var(--muted); }
+
+  /* 読み取り結果 */
+  #result { margin-top: 16px; }
+  #result-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  #result-list { display: flex; flex-direction: column; gap: 10px; }
+  .card {
+    background: var(--card);
+    border: 1.5px solid var(--soft);
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); }
+  .text {
+    margin: 8px 0 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 15px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+    max-height: 40svh;
+    overflow: auto;
+  }
+  .dest { margin: 8px 0 0; font-size: 14px; }
+  .dest strong { font-size: 16px; overflow-wrap: anywhere; }
+  .fields { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; margin: 10px 0 0; font-size: 14px; }
+  .fields dt { color: var(--muted); }
+  .fields dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+  .card .actions { margin-top: 12px; }
+  #still-preview { display: block; max-width: 100%; max-height: 50svh; margin: 10px auto 0; border-radius: 10px; }
+
+  /* 履歴 */
+  #history-section { margin-top: 28px; }
+  #history-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  #history { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--soft); }
+  #history li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--soft); }
+  #history .open {
+    flex: 1; min-width: 0; text-align: left;
+    border: 0; background: transparent; padding: 4px 2px;
+  }
+  #history .when { display: block; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #history .what {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    font-size: 14px; overflow-wrap: anywhere;
+  }
+  #history-empty { font-size: 13px; color: var(--muted); margin: 8px 2px; }
+
+  .note { margin-top: 24px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    max-width: calc(100vw - 32px);
+    padding: 10px 16px; border-radius: 999px;
+    background: var(--fg); color: var(--bg); font-size: 14px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
+  }
+
+  #drop-mask {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, .55); color: #fff; font-size: 18px;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>QRコードリーダー</h1>
+
+  <section id="viewer" aria-label="カメラの映像">
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div id="guide" hidden></div>
+    <div id="cam-controls" hidden>
+      <button type="button" id="torch" aria-pressed="false" hidden>ライト</button>
+      <label id="zoom-wrap" hidden>ズーム<input type="range" id="zoom"></label>
+      <select id="camera-select" aria-label="使うカメラ" hidden></select>
+    </div>
+    <div id="start-panel">
+      <button type="button" id="start" class="button primary">カメラを起動</button>
+      <p>カメラの使用を許可すると、枠の中のQRコードを読み取ります</p>
+    </div>
+  </section>
+
+  <p id="status" aria-live="polite"></p>
+  <p id="hint" hidden>読めないときは、コードとの距離を少し変えてピントを合わせてみてください。暗いときはライト、遠いときはズームが効きます。</p>
+
+  <div class="actions">
+    <label class="button">
+      画像から読む
+      <input type="file" id="file" accept="image/*" hidden>
+    </label>
+    <label class="toggle"><input type="checkbox" id="continuous">連続して読む</label>
+  </div>
+  <p class="sub">画像は貼り付け（Ctrl+V）やドラッグ＆ドロップでも読めます</p>
+
+  <section id="result" hidden aria-live="polite">
+    <div id="result-head">
+      <h2 id="result-title">読み取り結果</h2>
+      <button type="button" id="resume" class="button primary small" hidden>続けて読む</button>
+    </div>
+    <div id="result-list"></div>
+    <canvas id="still-preview" hidden></canvas>
+  </section>
+
+  <section id="history-section">
+    <div id="history-head">
+      <h2>履歴</h2>
+      <button type="button" id="clear-history" class="button small" hidden>すべて消す</button>
+    </div>
+    <ol id="history"></ol>
+    <p id="history-empty">まだ読み取っていません</p>
+  </section>
+
+  <p class="note">
+    読み取りはこの端末の中で行い、映像・画像・読み取った内容をどこにも送信しません。履歴はこのブラウザにだけ保存されます。<br>
+    <span id="engine-label"></span>
+  </p>
+</main>
+
+<div id="toast" role="status" hidden></div>
+<div id="drop-mask" hidden>ここに画像をドロップ</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
